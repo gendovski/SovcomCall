@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Консоль звонков Sovcombank</title>
+        <script src="https://unpkg.com/peerjs@1.2.0/dist/peerjs.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+</head>
+
+<body>
+	<script>
+		//Играем с кнопочкой
+		var button = document.createElement("button");
+		button.id = 'connectButton';
+		button.innerHTML = "Позвонить менеджеру";
+		var body = document.getElementsByTagName("body")[0];
+		body.appendChild(button);
+		button.addEventListener("click", function () { connect(socket); });
+		
+		//Получаем видео и контейнеры видео
+		var getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+		
+		//Создаем пира
+		var peer = new Peer({ host: "gendovski.com", port: "9000", key: "gendovski", path: "/call"});
+
+		//создаем сокет
+		var socket = new WebSocket("ws://gendovski.com:8081");
+		
+		// обработчик входящих сообщений
+		socket.onmessage = function(event) {
+			var incomingMessage = event.data;
+			console.log("Найден свободный менеджер " + incomingMessage);
+			var deletethis = document.getElementById("connectButton");
+			deletethis.parentNode.removeChild(deletethis);
+			var button = document.createElement("button");
+			button.id = 'disconnectButton';
+			button.disabled = true;
+			button.innerHTML = "Звоним менеджеру...";
+			var body = document.getElementsByTagName("body")[0];
+			body.appendChild(button);  
+			mancall(incomingMessage);
+		};
+
+		//Получаем ID, выводим его
+		peer.on('open', function (id) {
+			console.log('My peer ID is: ' + id);
+		});
+
+		//отправляем наш id на сервер
+		function connect(socket) {			
+			var outgoingMessage = "client: " + peer.id;
+			console.log('Отправляем id на сервер: ' + peer.id);
+			socket.send(outgoingMessage);
+		}
+		
+		//Звоним менеджеру при помощи полученного id
+		function mancall(id) {
+			navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(function (stream) {
+				var body = document.getElementsByTagName("body")[0];
+				var localVideo = document.createElement("video");
+				localVideo.id = 'localVideo';
+				localVideo.autoplay = true;
+				localVideo.muted = true;
+				body.appendChild(localVideo);
+				var remoteVideo = document.createElement("video");
+				remoteVideo.id = 'remoteVideo';
+				remoteVideo.autoplay = true;
+				body.appendChild(remoteVideo);
+			
+				localVideo.srcObject = stream;
+				console.log('Вызываем менеджера...');
+				var call = peer.call(id, stream);
+				call.on('stream', function(remoteStream) {
+					var deletethis = document.getElementById("disconnectButton");
+					deletethis.parentNode.removeChild(deletethis);
+					var button = document.createElement("button");
+					button.id = 'hangupButton';
+					button.innerHTML = "Завершить звонок";
+					var body = document.getElementsByTagName("body")[0];
+					body.appendChild(button);
+					button.addEventListener("click", function () { hangup(call); });
+					remoteVideo.srcObject = remoteStream;
+				});
+				call.on('close', function() {
+					console.log('Завершаем звонок...');
+					var deletethis = document.getElementById("localVideo");
+					deletethis.parentNode.removeChild(deletethis);
+					var deletethis = document.getElementById("remoteVideo");
+					deletethis.parentNode.removeChild(deletethis);
+					var deletethis = document.getElementById("hangupButton");
+					deletethis.parentNode.removeChild(deletethis);
+					var button = document.createElement("button");
+					button.id = 'connectButton'
+					button.innerHTML = "Позвонить менеджеру";
+					var body = document.getElementsByTagName("body")[0];
+					body.appendChild(button);
+					button.addEventListener("click", function () { connect(socket); });
+					//Уничтожить видеопоток?
+				});
+			}).catch(function (err) {
+				console.log("An error occurred: " + err);
+			});
+		}
+		
+		function hangup(call) {
+			call.close();
+		}
+		
+	</script>
+</body>
+
+</html>

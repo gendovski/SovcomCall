@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Консоль звонков Sovcombank</title>
+	<script src="https://unpkg.com/peerjs@1.2.0/dist/peerjs.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	
+</head>
+<body>
+	<script>
+		//Играем с кнопочкой
+		var button = document.createElement("button");
+		button.id = 'connectButton';
+		button.innerHTML = "Отключено. Нажмите для подключения.";
+		var body = document.getElementsByTagName("body")[0];
+		body.appendChild(button);
+		button.addEventListener("click", function () { connect(socket); });
+
+		//Получаем видео и контейнеры видео
+		var getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+		localvideo = document.getElementById('localVideo');
+		remotevideo = document.getElementById('remoteVideo');
+		
+		//Создаем пира
+		var peer = new Peer({ host: "gendovski.com", port: "9000", key: "gendovski", path: "/call"});
+		//создаем сокет
+		var socket = new WebSocket("ws://gendovski.com:8081");
+
+		//Получаем ID, выводим его
+		peer.on('open', function (id) {
+			console.log('My peer ID is: ' + id);
+		});
+
+		peer.on('call', function (call) {
+			console.log('Call recieved');
+			//Проигрываем звонок
+			//var audio = new Audio('кштпещту.mp3');
+			//audio.play();
+			
+			//Играем с кнопочками
+			var deletethis = document.getElementById("disconnectButton");
+			deletethis.parentNode.removeChild(deletethis);
+			var button = document.createElement("button");
+			button.id = 'answerButton'
+			button.innerHTML = "Получен звонок. Ответить.";
+			var body = document.getElementsByTagName("body")[0];
+			body.appendChild(button);
+			button.addEventListener("click", function () { answer(call); });
+		});
+		
+		//Функция ответа на звонок
+		function answer(call) {
+			//audio.stop();
+			//Надо поиграть с кнопочками
+			console.log('Получен звонок, отвечаем..');
+			var deletethis = document.getElementById("answerButton");
+			deletethis.parentNode.removeChild(deletethis);
+			var button = document.createElement("button");
+			button.id = 'hangupButton'
+			button.innerHTML = "Завершить звонок";
+			var body = document.getElementsByTagName("body")[0];
+			body.appendChild(button);
+			button.addEventListener("click", function () { hangup(call); });
+
+			//Запрашиваем доступ к видеоустройству
+			navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(function (stream) {
+				//Создаем контейнеры
+				var body = document.getElementsByTagName("body")[0];
+				var localVideo = document.createElement("video");
+				localVideo.id = 'localVideo';
+				localVideo.autoplay = true;
+				localVideo.muted = true;
+				body.appendChild(localVideo);
+				var remoteVideo = document.createElement("video");
+				remoteVideo.id = 'remoteVideo';
+				remoteVideo.autoplay = true;
+				body.appendChild(remoteVideo);
+				
+				//И заполняем их свежими потоками
+				localVideo.srcObject = stream;
+				console.log('Принимаем звонок...');
+				call.answer(stream);
+				call.on('stream', function(remoteStream) {	
+					console.log('Звонок принят');
+					remoteVideo.srcObject = remoteStream;
+				});
+				call.on('close', function() {
+					console.log('Завершаем звонок...');
+					var deletethis = document.getElementById("localVideo");
+					deletethis.parentNode.removeChild(deletethis);
+					var deletethis = document.getElementById("remoteVideo");
+					deletethis.parentNode.removeChild(deletethis);
+					var deletethis = document.getElementById("hangupButton");
+					deletethis.parentNode.removeChild(deletethis);
+					var button = document.createElement("button");
+					button.id = 'disconnectButton'
+					button.innerHTML = "Подключено. Нажмите для отключения.";
+					var body = document.getElementsByTagName("body")[0];
+					body.appendChild(button);
+					button.addEventListener("click", function () { disconnect(socket); });
+					//Уничтожить видеопоток здесь и в хенгапе?
+				});
+			}, function(err) {
+				console.log('Failed to get local stream' ,err);
+			});
+		}
+		
+		//Функция завершения звонка
+		function hangup(call) {
+			call.close();
+		}
+		
+		//Подключаемся к серверу
+		function connect(socket) {			
+			var outgoingMessage = "manager: " + peer.id;
+			console.log('Отправляем id на сервер: ' + peer.id);
+			socket.send(outgoingMessage);
+			
+			//играем с кнопочками
+			var deletethis = document.getElementById("connectButton");
+			deletethis.parentNode.removeChild(deletethis);
+			var button = document.createElement("button");
+			button.id = 'disconnectButton'
+			button.innerHTML = "Подключено. Нажмите для отключения.";
+			var body = document.getElementsByTagName("body")[0];
+			body.appendChild(button);
+			button.addEventListener("click", function () { disconnect(socket); });
+		}
+		
+		//Отключаемся от сервера
+		function disconnect(socket) {
+			var outgoingMessage = "disconnect: " + peer.id;
+			console.log('Отключаемся как клиент ' + peer.id);
+			socket.send(outgoingMessage);
+			
+			//ещё играем с кнопочками
+			var deletethis = document.getElementById("disconnectButton");
+			deletethis.parentNode.removeChild(deletethis);
+			var button = document.createElement("button");
+			button.id = 'connectButton'
+			button.innerHTML = "Отключено. Нажмите для подключения.";
+			var body = document.getElementsByTagName("body")[0];
+			body.appendChild(button);
+			button.addEventListener("click", function () { connect(socket); });
+		}
+	</script>
+</body>
+
+</html>
